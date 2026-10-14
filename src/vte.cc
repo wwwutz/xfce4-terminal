@@ -8853,6 +8853,95 @@ Terminal::text_blink_timer_callback()
         return false; /* don't run again */
 }
 
+/*
+ * Minimum contrast: text whose WCAG 2 contrast ratio against its background
+ * is below the minimum (default 3.0; environment VTE_MINIMUM_CONTRAST, 1 or
+ * less disables) is drawn lighter or darker, mixing it toward white or black
+ * so that its hue stays, until it reaches the ratio.  Only the drawing
+ * changes; the colors applications chose stay as they are.  Same as xterm's
+ * minimumContrast resource.
+ */
+namespace {
+
+double
+minimum_contrast()
+{
+        static double const value = [] {
+                auto const env = g_getenv("VTE_MINIMUM_CONTRAST");
+                return env ? g_ascii_strtod(env, nullptr) : 3.0;
+        }();
+        return value;
+}
+
+/* WCAG 2 relative luminance, 0.0 .. 1.0 */
+double
+relative_luminance(vte::color::rgb const& c)
+{
+        auto const linear = [](unsigned v) {
+                auto const s = v / 65535.0;
+                return s <= 0.04045 ? s / 12.92 : pow((s + 0.055) / 1.055, 2.4);
+        };
+        return 0.2126 * linear(c.red) + 0.7152 * linear(c.green) + 0.0722 * linear(c.blue);
+}
+
+/* @c mixed toward @target (0 or 0xffff) by @n/256 */
+vte::color::rgb
+mix_toward(vte::color::rgb const& c,
+           unsigned target,
+           unsigned n)
+{
+        auto const one = [&](unsigned v) {
+                return (uint16_t)(v + ((int)target - (int)v) * (int)n / 256);
+        };
+        auto result = c;
+        result.red = one(c.red);
+        result.green = one(c.green);
+        result.blue = one(c.blue);
+        return result;
+}
+
+void
+ensure_minimum_contrast(vte::color::rgb& fg,
+                        vte::color::rgb const& bg,
+                        bool dim)
+{
+        auto wanted = minimum_contrast();
+        if (dim)  /* half the margin, so dim text still looks dimmer */
+                wanted = 1.0 + (wanted - 1.0) / 2.0;
+        if (wanted <= 1.0)
+                return;
+
+        auto const yf = relative_luminance(fg);
+        auto const yb = relative_luminance(bg);
+        /* luminance fg needs, if lighter or darker than bg */
+        auto const need_light = wanted * (yb + 0.05) - 0.05;
+        auto const need_dark = (yb + 0.05) / wanted - 0.05;
+        if (yf >= need_light || yf <= need_dark)
+                return;
+
+        /* prefer the side fg is already on, if it can get there */
+        auto lighter = yf > yb ? (need_light <= 1.0 || need_dark < 0.0)
+                               : (need_dark < 0.0 && need_light <= 1.0);
+        /* neither side reaches it: take whichever end is better */
+        if (need_light > 1.0 && need_dark < 0.0)
+                lighter = 1.05 / (yb + 0.05) > (yb + 0.05) / 0.05;
+
+        auto const target = lighter ? 0xffffu : 0u;
+        auto const limit = lighter ? std::min(need_light, 1.0) : std::max(need_dark, 0.0);
+        auto lo = 0u, hi = 256u;
+        while (lo < hi) {
+                auto const mid = (lo + hi) / 2;
+                auto const y = relative_luminance(mix_toward(fg, target, mid));
+                if (lighter ? y >= limit : y <= limit)
+                        hi = mid;
+                else
+                        lo = mid + 1;
+        }
+        fg = mix_toward(fg, target, lo);
+}
+
+} // anon namespace
+
 /* Draw a string of characters with similar attributes. */
 void
 Terminal::draw_cells(vte::view::DrawingContext::TextRequest* items,
@@ -8876,6 +8965,19 @@ Terminal::draw_cells(vte::view::DrawingContext::TextRequest* items,
 
         rgb_from_index<8, 8, 8>(fore, fg);
         rgb_from_index<8, 8, 8>(back, bg);
+
+        /* Keep text readable, unless the application chose the same color
+         * for text and background, e.g., to hide it.  Equal pixels can also
+         * come from different colors (e.g., a palette entry matching the
+         * default background), which this does fix. */
+        {
+                auto const rgb_mask = VTE_RGB_COLOR_MASK(8, 8, 8);
+                auto const dim = !(fore & rgb_mask) && (fore & VTE_DIM_COLOR);
+                auto const plain_fore = dim ? (fore & ~VTE_DIM_COLOR) : fore;
+                if (plain_fore != back)
+                        ensure_minimum_contrast(fg, bg, dim);
+        }
+
         // FIXMEchpe defer resolving deco color until we actually need to draw an underline?
         if (deco == VTE_DEFAULT_FG)
                 dc = fg;
