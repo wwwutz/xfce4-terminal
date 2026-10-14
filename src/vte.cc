@@ -8855,16 +8855,16 @@ Terminal::text_blink_timer_callback()
 
 /*
  * Minimum contrast: text whose WCAG 2 contrast ratio against its background
- * is below the minimum (default 3.0; environment VTE_MINIMUM_CONTRAST, 1 or
- * less disables) is drawn lighter or darker, mixing it toward white or black
- * so that its hue stays, until it reaches the ratio.  Only the drawing
- * changes; the colors applications chose stay as they are.  Same as xterm's
- * minimumContrast resource.
+ * is below the minimum (the minimum-contrast property; its default is 3.0,
+ * or VTE_MINIMUM_CONTRAST from the environment; 1 or less disables) is drawn
+ * lighter or darker, mixing it toward white or black so that its hue stays,
+ * until it reaches the ratio.  Only the drawing changes; the colors
+ * applications chose stay as they are.  Same as xterm's minimumContrast.
  */
 namespace {
 
 double
-minimum_contrast()
+default_minimum_contrast()
 {
         static double const value = [] {
                 auto const env = g_getenv("VTE_MINIMUM_CONTRAST");
@@ -8903,9 +8903,9 @@ mix_toward(vte::color::rgb const& c,
 void
 ensure_minimum_contrast(vte::color::rgb& fg,
                         vte::color::rgb const& bg,
+                        double wanted,
                         bool dim)
 {
-        auto wanted = minimum_contrast();
         if (dim)  /* half the margin, so dim text still looks dimmer */
                 wanted = 1.0 + (wanted - 1.0) / 2.0;
         if (wanted <= 1.0)
@@ -8975,7 +8975,7 @@ Terminal::draw_cells(vte::view::DrawingContext::TextRequest* items,
                 auto const dim = !(fore & rgb_mask) && (fore & VTE_DIM_COLOR);
                 auto const plain_fore = dim ? (fore & ~VTE_DIM_COLOR) : fore;
                 if (plain_fore != back)
-                        ensure_minimum_contrast(fg, bg, dim);
+                        ensure_minimum_contrast(fg, bg, minimum_contrast(), dim);
         }
 
         // FIXMEchpe defer resolving deco color until we actually need to draw an underline?
@@ -10458,6 +10458,24 @@ Terminal::set_allow_bold(bool setting)
 
 	m_allow_bold = setting;
 	invalidate_all();
+
+        return true;
+}
+
+double
+Terminal::minimum_contrast() const noexcept
+{
+        return m_minimum_contrast < 0.0 ? default_minimum_contrast() : m_minimum_contrast;
+}
+
+bool
+Terminal::set_minimum_contrast(double ratio)
+{
+        if (_vte_double_equal(ratio, minimum_contrast()))
+                return false;
+
+        m_minimum_contrast = ratio;
+        invalidate_all();
 
         return true;
 }

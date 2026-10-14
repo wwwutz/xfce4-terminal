@@ -1036,6 +1036,9 @@ try
                 case PROP_INPUT_ENABLED:
                         g_value_set_boolean (value, vte_terminal_get_input_enabled (terminal));
                         break;
+                case PROP_MINIMUM_CONTRAST:
+                        g_value_set_double (value, IMPL(terminal)->minimum_contrast());
+                        break;
                 case PROP_MOUSE_POINTER_AUTOHIDE:
                         g_value_set_boolean (value, vte_terminal_get_mouse_autohide (terminal));
                         break;
@@ -1193,6 +1196,10 @@ try
                         break;
                 case PROP_INPUT_ENABLED:
                         vte_terminal_set_input_enabled (terminal, g_value_get_boolean (value));
+                        break;
+                case PROP_MINIMUM_CONTRAST:
+                        if (IMPL(terminal)->set_minimum_contrast(g_value_get_double (value)))
+                                g_object_notify_by_pspec(object, pspecs[PROP_MINIMUM_CONTRAST]);
                         break;
                 case PROP_MOUSE_POINTER_AUTOHIDE:
                         vte_terminal_set_mouse_autohide (terminal, g_value_get_boolean (value));
@@ -2435,6 +2442,19 @@ vte_terminal_class_init(VteTerminalClass *klass)
                 g_param_spec_boolean ("input-enabled", NULL, NULL,
                                       TRUE,
                                       (GParamFlags) (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS | G_PARAM_EXPLICIT_NOTIFY));
+
+        /**
+         * VteTerminal:minimum-contrast:
+         *
+         * The minimum WCAG 2 contrast ratio between text and its background,
+         * from 1.0 (off) to 21.0.  Text with less contrast is drawn lighter or
+         * darker, keeping its hue.  The default is 3.0, or the value of
+         * VTE_MINIMUM_CONTRAST in the environment.
+         */
+        pspecs[PROP_MINIMUM_CONTRAST] =
+                g_param_spec_double ("minimum-contrast", NULL, NULL,
+                                     1.0, 21.0, 3.0,
+                                     (GParamFlags) (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS | G_PARAM_EXPLICIT_NOTIFY));
 
         /**
          * VteTerminal:pointer-autohide:

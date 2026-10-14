@@ -495,6 +495,7 @@ public:
         bool m_audible_bell{true};
         bool m_allow_bold{true};
         bool m_bold_is_bright{false};
+        double m_minimum_contrast{-1.0}; /* < 0: VTE_MINIMUM_CONTRAST or 3.0 */
         bool m_rewrap_on_resize{true};
         gboolean m_text_modified_flag;
         gboolean m_text_inserted_flag;
@@ -1588,6 +1589,8 @@ public:
         auto backspace_binding() const noexcept { return m_backspace_binding; }
         bool set_background_alpha(double alpha);
         bool set_bold_is_bright(bool setting);
+        double minimum_contrast() const noexcept;
+        bool set_minimum_contrast(double ratio);
         bool set_cell_height_scale(double scale);
         bool set_cell_width_scale(double scale);
         bool set_cjk_ambiguous_width(int width);
