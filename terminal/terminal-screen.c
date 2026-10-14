@@ -162,6 +162,8 @@ terminal_screen_update_misc_cursor_blinks (TerminalScreen *screen);
 static void
 terminal_screen_update_misc_cursor_shape (TerminalScreen *screen);
 static void
+terminal_screen_update_misc_minimum_contrast (TerminalScreen *screen);
+static void
 terminal_screen_update_misc_mouse_autohide (TerminalScreen *screen);
 static void
 terminal_screen_update_misc_rewrap_on_resize (TerminalScreen *screen);
@@ -241,6 +243,8 @@ struct _TerminalScreen
   GtkWidget *terminal;
   GtkWidget *scrollbar;
   GtkWidget *tab_label;
+
+  gdouble minimum_contrast; /* VTE's own ratio, used while the preference is on */
 
   GdkRGBA background_color;
 
@@ -429,6 +433,9 @@ terminal_screen_init (TerminalScreen *screen)
   terminal_screen_update_misc_bell (screen);
   terminal_screen_update_misc_cursor_blinks (screen);
   terminal_screen_update_misc_cursor_shape (screen);
+  if (terminal_screen_has_minimum_contrast ())
+    g_object_get (G_OBJECT (screen->terminal), "minimum-contrast", &screen->minimum_contrast, NULL);
+  terminal_screen_update_misc_minimum_contrast (screen);
   terminal_screen_update_misc_mouse_autohide (screen);
   terminal_screen_update_misc_rewrap_on_resize (screen);
   terminal_screen_update_scrolling_bar (screen);
@@ -709,6 +716,8 @@ terminal_screen_preferences_changed (TerminalPreferences *preferences,
     terminal_screen_update_misc_cursor_blinks (screen);
   else if (strcmp ("misc-cursor-shape", name) == 0)
     terminal_screen_update_misc_cursor_shape (screen);
+  else if (strcmp ("misc-minimum-contrast", name) == 0)
+    terminal_screen_update_misc_minimum_contrast (screen);
   else if (strcmp ("misc-mouse-autohide", name) == 0)
     terminal_screen_update_misc_mouse_autohide (screen);
   else if (strcmp ("misc-rewrap-on-resize", name) == 0)
@@ -1375,6 +1384,38 @@ terminal_screen_update_misc_cursor_shape (TerminalScreen *screen)
 
   vte_terminal_set_cursor_shape (VTE_TERMINAL (screen->terminal), shape);
 }
+
+
+static void
+terminal_screen_update_misc_minimum_contrast (TerminalScreen *screen)
+{
+  gboolean bval;
+
+  if (!terminal_screen_has_minimum_contrast ())
+    return;
+
+  g_object_get (G_OBJECT (screen->preferences), "misc-minimum-contrast", &bval, NULL);
+  g_object_set (G_OBJECT (screen->terminal), "minimum-contrast", bval ? screen->minimum_contrast : 1.0, NULL);
+}
+
+
+
+/**
+ * terminal_screen_has_minimum_contrast:
+ *
+ * Return value: whether the VTE in use can keep text readable
+ *               (VteTerminal:minimum-contrast, a local VTE patch).
+ **/
+gboolean
+terminal_screen_has_minimum_contrast (void)
+{
+  GObjectClass *klass = g_type_class_ref (VTE_TYPE_TERMINAL);
+  gboolean result = g_object_class_find_property (klass, "minimum-contrast") != NULL;
+
+  g_type_class_unref (klass);
+  return result;
+}
+
 
 
 static void

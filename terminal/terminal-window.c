@@ -244,6 +244,8 @@ terminal_window_action_toggle_borders (TerminalWindow *window);
 static gboolean
 terminal_window_action_fullscreen (TerminalWindow *window);
 static gboolean
+terminal_window_action_minimum_contrast (TerminalWindow *window);
+static gboolean
 terminal_window_action_readonly (TerminalWindow *window);
 static gboolean
 terminal_window_action_scroll_on_output (TerminalWindow *window);
@@ -900,6 +902,16 @@ static XfceGtkActionEntry action_entries[] = {
     N_ ("Toggle fullscreen mode"),
     "view-fullscreen",
     G_CALLBACK (terminal_window_action_fullscreen),
+  },
+  {
+    TERMINAL_WINDOW_ACTION_MINIMUM_CONTRAST,
+    "<Actions>/terminal-window/minimum-contrast",
+    "",
+    XFCE_GTK_CHECK_MENU_ITEM,
+    N_ ("Minimum _Contrast"),
+    N_ ("Draw text lighter or darker where its colors would make it hard to read"),
+    NULL,
+    G_CALLBACK (terminal_window_action_minimum_contrast),
   },
   {
     TERMINAL_WINDOW_ACTION_READ_ONLY,
@@ -2587,6 +2599,19 @@ terminal_window_action_toggle_borders (TerminalWindow *window)
 
 
 static gboolean
+terminal_window_action_minimum_contrast (TerminalWindow *window)
+{
+  gboolean minimum_contrast;
+
+  /* a preference: applies to all terminals and is saved */
+  g_object_get (G_OBJECT (window->priv->preferences), "misc-minimum-contrast", &minimum_contrast, NULL);
+  g_object_set (G_OBJECT (window->priv->preferences), "misc-minimum-contrast", !minimum_contrast, NULL);
+  return TRUE;
+}
+
+
+
+static gboolean
 terminal_window_action_fullscreen (TerminalWindow *window)
 {
   if (gtk_widget_get_visible (GTK_WIDGET (window)))
@@ -3886,6 +3911,13 @@ terminal_window_menu_add_section (TerminalWindow *window,
       xfce_gtk_toggle_menu_item_new_from_action_entry (get_action_entry (TERMINAL_WINDOW_ACTION_SHOW_TOOLBAR), G_OBJECT (window), gtk_widget_is_visible (window->toolbar), GTK_MENU_SHELL (insert_to_menu));
       xfce_gtk_toggle_menu_item_new_from_action_entry (get_action_entry (TERMINAL_WINDOW_ACTION_SHOW_BORDERS), G_OBJECT (window), gtk_window_get_decorated (GTK_WINDOW (window)), GTK_MENU_SHELL (insert_to_menu));
       xfce_gtk_toggle_menu_item_new_from_action_entry (get_action_entry (TERMINAL_WINDOW_ACTION_FULLSCREEN), G_OBJECT (window), window->is_fullscreen, GTK_MENU_SHELL (insert_to_menu));
+      if (terminal_screen_has_minimum_contrast ())
+        {
+          gboolean minimum_contrast;
+
+          g_object_get (G_OBJECT (window->priv->preferences), "misc-minimum-contrast", &minimum_contrast, NULL);
+          xfce_gtk_toggle_menu_item_new_from_action_entry (get_action_entry (TERMINAL_WINDOW_ACTION_MINIMUM_CONTRAST), G_OBJECT (window), minimum_contrast, GTK_MENU_SHELL (insert_to_menu));
+        }
       xfce_gtk_menu_append_separator (GTK_MENU_SHELL (menu));
     }
 

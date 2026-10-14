@@ -99,6 +99,7 @@ enum
   PROP_MISC_DEFAULT_GEOMETRY,
   PROP_MISC_INHERIT_GEOMETRY,
   PROP_MISC_MENUBAR_DEFAULT,
+  PROP_MISC_MINIMUM_CONTRAST,
   PROP_MISC_MOUSE_AUTOHIDE,
   PROP_MISC_MOUSE_WHEEL_ZOOM,
   PROP_MISC_RESIZE_ON_ZOOM,
@@ -916,6 +917,19 @@ terminal_preferences_class_init (TerminalPreferencesClass *klass)
     g_param_spec_boolean ("misc-menubar-default",
                           NULL,
                           "MiscMenubarDefault",
+                          TRUE,
+                          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
+
+  /**
+   * TerminalPreferences:misc-minimum-contrast:
+   *
+   * Whether VTE draws text with too little contrast against its background
+   * lighter or darker (VteTerminal:minimum-contrast, if VTE has it).
+   **/
+  preferences_props[PROP_MISC_MINIMUM_CONTRAST] =
+    g_param_spec_boolean ("misc-minimum-contrast",
+                          NULL,
+                          "MiscMinimumContrast",
                           TRUE,
                           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
 
