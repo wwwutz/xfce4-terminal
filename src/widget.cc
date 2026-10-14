@@ -1450,13 +1450,15 @@ Widget::im_focus_out() noexcept
 void
 Widget::im_preedit_changed() noexcept
 {
-        auto str = vte::glib::StringPtr{};
-        auto attrs = vte::Freeable<PangoAttrList>{};
+        char* preedit = nullptr;
+        PangoAttrList* preedit_attrs = nullptr;
         auto cursorpos = 0;
         gtk_im_context_get_preedit_string(m_im_context.get(),
-                                          std::out_ptr(str),
-                                          std::out_ptr(attrs),
+                                          &preedit,
+                                          &preedit_attrs,
                                           &cursorpos);
+        auto str = vte::glib::take_string(preedit);
+        auto attrs = vte::take_freeable(preedit_attrs);
         _vte_debug_print(vte::debug::category::EVENTS, "Input method pre-edit changed string \"{}\" cursor-position {}",
                          str.get(), cursorpos);
 

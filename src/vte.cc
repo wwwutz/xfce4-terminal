@@ -7912,14 +7912,14 @@ bool
 Terminal::update_font_desc()
 {
 #if VTE_GTK == 3
-        auto desc = vte::Freeable<PangoFontDescription>{};
-
         auto context = gtk_widget_get_style_context(m_widget);
         gtk_style_context_save(context);
         gtk_style_context_set_state (context, GTK_STATE_FLAG_NORMAL);
+        PangoFontDescription* font = nullptr;
         gtk_style_context_get(context, GTK_STATE_FLAG_NORMAL, "font",
-                              static_cast<PangoFontDescription**>(std::out_ptr(desc)),
+                              &font,
                               nullptr);
+        auto desc = vte::take_freeable(font);
 
         gtk_style_context_restore(context);
 #elif VTE_GTK == 4
