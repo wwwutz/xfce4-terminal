@@ -35,6 +35,7 @@
 #endif
 
 #include "terminal-app.h"
+#include "terminal-embedded-fonts.h"
 #include "terminal-gdbus.h"
 #include "terminal-preferences-dialog.h"
 #include "terminal-private.h"
@@ -202,6 +203,9 @@ main (int argc, char **argv)
     g_warning ("Locale not supported by C library.");
 
   g_set_application_name (_("Xfce Terminal"));
+
+  /* make the compiled-in default font available, before GTK uses fonts */
+  terminal_embedded_fonts_register ();
 
   /* initialize GTK: do this before our parsing so GTK parses its options first */
   gtk_init (&argc, &argv);

@@ -37,6 +37,8 @@ xfce4_terminal_SOURCES = \
 	$(xfce4_terminal_headers) \
 	main.c \
 	terminal-app.c \
+	terminal-embedded-fonts.c \
+	terminal-embedded-fonts.h \
 	terminal-encoding-action.c \
 	terminal-gdbus.c \
 	terminal-image-loader.c \
@@ -61,6 +63,7 @@ xfce4_terminal_CFLAGS = \
 	$(LIBXFCE4KBD_PRIVATE_CFLAGS) \
 	$(XFCONF_CFLAGS) \
 	$(PCRE2_CFLAGS) \
+	$(FONTCONFIG_CFLAGS) \
 	$(PLATFORM_CFLAGS)
 
 xfce4_terminal_LDFLAGS = \
@@ -78,7 +81,20 @@ xfce4_terminal_LDADD = \
 	$(LIBXFCE4UTIL_LIBS) \
 	$(LIBXFCE4KBD_PRIVATE_LIBS) \
 	$(XFCONF_LIBS) \
-	$(PCRE2_LIBS)
+	$(PCRE2_LIBS) \
+	$(FONTCONFIG_LIBS)
+
+# fonts compiled into xfce4-terminal, see terminal-embedded-fonts.c
+EMBEDDED_FONTS = \
+	$(top_srcdir)/hack-braille-3.003/HackBraille-Regular.ttf \
+	$(top_srcdir)/hack-braille-3.003/HackBraille-Bold.ttf \
+	$(top_srcdir)/hack-braille-3.003/HackBraille-Italic.ttf \
+	$(top_srcdir)/hack-braille-3.003/HackBraille-BoldItalic.ttf
+
+embedded-fonts.h: $(EMBEDDED_FONTS) $(srcdir)/mkembedfont.sh
+	$(SHELL) $(srcdir)/mkembedfont.sh $(EMBEDDED_FONTS) > $@
+
+xfce4_terminal-terminal-embedded-fonts.$(OBJEXT): embedded-fonts.h
 
 if HAVE_UTEMPTER
 xfce4_terminal_LDADD += -lutempter
@@ -162,7 +178,11 @@ clean-local:
 EXTRA_DIST = \
 	terminal-config.h.in \
 	terminal-marshal.list \
+	mkembedfont.sh \
 	meson.build \
 	$(NULL)
+
+MOSTLYCLEANFILES = \
+	embedded-fonts.h
 
 # vi:set ts=8 sw=8 noet ai nocindent:

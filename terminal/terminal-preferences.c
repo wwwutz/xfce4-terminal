@@ -805,7 +805,7 @@ terminal_preferences_class_init (TerminalPreferencesClass *klass)
     g_param_spec_string ("font-name",
                          NULL,
                          "FontName",
-                         "Monospace 12",
+                         "Hack Braille 12", /* compiled in, see terminal-embedded-fonts.c */
                          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
 
   /**
