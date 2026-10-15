@@ -1,0 +1,66 @@
+From: Paul Menzel <pmenzel@molgen.mpg.de>
+Date: Wed, 14 Oct 2026 12:00:00 +0200
+Subject: [PATCH] all: Do not use std::out_ptr
+
+std::out_ptr is a C++23 library feature, that libstdc++ only provides
+since GCC 14 (__cpp_lib_out_ptr). meson.build accepts g++ >= 12.1
+though, and with GCC 12.5 the build fails:
+
+    ../source/src/vte.cc:7921:72: error: ‘out_ptr’ is not a member of ‘std’; did you mean ‘auto_ptr’?
+
+Commit 33e3bcec ("all: Use out_ptr") introduced the three call sites.
+Pass plain pointers instead, and hand them over to the smart pointers
+afterwards.
+
+Assisted-by: claude-opus-5.5 (Claude Code)
+---
+ src/vte.cc    |  6 +++---
+ src/widget.cc | 10 ++++++----
+ 2 files changed, 9 insertions(+), 7 deletions(-)
+
+diff --git a/src/vte.cc b/src/vte.cc
+index 4f6b437..843b159 100644
+--- a/src/vte.cc
++++ b/src/vte.cc
+@@ -7912,14 +7912,14 @@ bool
+ Terminal::update_font_desc()
+ {
+ #if VTE_GTK == 3
+-        auto desc = vte::Freeable<PangoFontDescription>{};
+-
+         auto context = gtk_widget_get_style_context(m_widget);
+         gtk_style_context_save(context);
+         gtk_style_context_set_state (context, GTK_STATE_FLAG_NORMAL);
++        PangoFontDescription* font = nullptr;
+         gtk_style_context_get(context, GTK_STATE_FLAG_NORMAL, "font",
+-                              static_cast<PangoFontDescription**>(std::out_ptr(desc)),
++                              &font,
+                               nullptr);
++        auto desc = vte::take_freeable(font);
+ 
+         gtk_style_context_restore(context);
+ #elif VTE_GTK == 4
+diff --git a/src/widget.cc b/src/widget.cc
+index 2ea7eee..c22aa5d 100644
+--- a/src/widget.cc
++++ b/src/widget.cc
+@@ -1450,13 +1450,15 @@ Widget::im_focus_out() noexcept
+ void
+ Widget::im_preedit_changed() noexcept
+ {
+-        auto str = vte::glib::StringPtr{};
+-        auto attrs = vte::Freeable<PangoAttrList>{};
++        char* preedit = nullptr;
++        PangoAttrList* preedit_attrs = nullptr;
+         auto cursorpos = 0;
+         gtk_im_context_get_preedit_string(m_im_context.get(),
+-                                          std::out_ptr(str),
+-                                          std::out_ptr(attrs),
++                                          &preedit,
++                                          &preedit_attrs,
+                                           &cursorpos);
++        auto str = vte::glib::take_string(preedit);
++        auto attrs = vte::take_freeable(preedit_attrs);
+         _vte_debug_print(vte::debug::category::EVENTS, "Input method pre-edit changed string \"{}\" cursor-position {}",
+                          str.get(), cursorpos);
+ 

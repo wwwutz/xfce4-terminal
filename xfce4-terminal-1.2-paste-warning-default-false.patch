@@ -1,0 +1,13 @@
+diff --git a/terminal/terminal-preferences.c b/terminal/terminal-preferences.c
+index a165383..b3b901e 100644
+--- a/terminal/terminal-preferences.c
++++ b/terminal/terminal-preferences.c
+@@ -1093,7 +1093,7 @@ terminal_preferences_class_init (TerminalPreferencesClass *klass)
+     g_param_spec_boolean ("misc-show-unsafe-paste-dialog",
+                           NULL,
+                           "MiscShowUnsafePasteDialog",
+-                          TRUE,
++                          FALSE,
+                           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
+ 
+   /**

@@ -1,0 +1,42 @@
+#!/usr/bin/env beesh
+
+# BEE_VERSION xfce4-terminal-1.1.5-1
+
+#SRCURL[0]="https://archive.xfce.org/src/apps/xfce4-terminal/${PKGVERSION[2]}/xfce4-terminal-${PKGVERSION}.tar.xz"
+SRCURL[0]="https://beehive.molgen.mpg.de/d779b64ead82330b6bbc7d500f542490/xfce4-terminal-1.1.5.tar.xz"
+# Hack Braille 3.003 (Hack plus braille; MIT, Bitstream Vera), compiled in by xfce4-terminal-1.1.5-embedded-font.patch
+SRCURL[1]="https://beehive.molgen.mpg.de/9d3164696416dac1787155b809fd6787/hack-braille-3.003.tar.gz"
+
+PATCHURL+=("https://beehive.molgen.mpg.de/8d9408ec1b4244ffa3215d588dd45dca/xfce4-terminal-1.2-paste-warning-default-false.patch")
+# Local names carry the md5: bee reuses any cached file of the same name.
+PATCHURL+=("https://beehive.molgen.mpg.de/41880e975f5ad5e4d0229ef31653bb48/xfce4-terminal-1.1.5-embedded-font.patch xfce4-terminal-1.1.5-embedded-font-41880e97.patch")
+# View > Minimum Contrast (needs vte with VteTerminal:minimum-contrast, otherwise hidden)
+PATCHURL+=("https://beehive.molgen.mpg.de/ff7d5a19356d52cdebfb3a900b4839fb/xfce4-terminal-1.1.5-minimum-contrast-toggle.patch xfce4-terminal-1.1.5-minimum-contrast-toggle-ff7d5a19.patch")
+
+# EXCLUDE+=()
+
+build_in_sourcedir
+
+# sourcesubdir_append src
+
+#mee_extract() {
+#    bee_extract "${@}"
+#}
+
+#mee_patch() {
+#    bee_patch "${@}"
+#    echo "" > ${S}/po/LINGUAS
+#}
+
+mee_configure() {
+    bee_configure \
+        --disable-nls
+}
+
+#mee_build() {
+#    bee_build
+#}
+
+#mee_install() {
+#    bee_install
+#}

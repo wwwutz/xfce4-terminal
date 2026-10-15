@@ -1,0 +1,50 @@
+#!/usr/bin/env beesh
+
+# BEE_VERSION vte-0.84.1-1
+
+# SRCURL[0]="https://download.gnome.org/sources/vte/${PKGVERSION[2]}/vte-${PKGVERSION}.tar.xz"
+SRCURL[0]="https://beehive.molgen.mpg.de/ea4e16dbba54a6b8ba2cbb95cfdaa217/vte-0.84.1.tar.xz"
+
+# std::out_ptr needs libstdc++ from GCC 14, but meson.build accepts GCC 12.1.
+PATCHURL+=("https://beehive.molgen.mpg.de/a10f77b0a96086ce67dbfbed929100b8/vte-0.84.1-do-not-use-std-out_ptr.patch")
+# Keep text readable: minimum WCAG contrast 3.0 (property VteTerminal:minimum-contrast,
+# VTE_MINIMUM_CONTRAST in the environment; 1 disables).
+# Local names carry the md5: bee reuses any cached file of the same name.
+PATCHURL+=("https://beehive.molgen.mpg.de/901cb2b0745a3e6be6f61dbe827e79fa/vte-0.84.1-min-contrast.patch vte-0.84.1-min-contrast-901cb2b0.patch")
+
+# build_in_sourcedir
+
+# sourcesubdir_append src
+
+#mee_extract() {
+#    bee_extract "${@}"
+#}
+
+mee_patch() {
+    bee_patch "${@}"
+    echo "" >po/LINGUAS
+}
+
+mee_configure() {
+    # The release tarball ships the sources of fast_float, fmt and simdutf
+    # under subprojects/. fmt is pulled in with an explicit subproject()
+    # call, but the other two are dependency() fallbacks, which bee's
+    # --wrap-mode=nofallback forbids. Allow exactly those two; they are
+    # header-only or built statically and are not installed.
+    bee_configure \
+        --force-fallback-for=fast_float,simdutf
+}
+
+#mee_build() {
+#    bee_build
+#}
+
+#mee_install() {
+#    bee_install
+#}
+
+mee_install_post() {
+    # Keep the vte-2.91 test terminals, but out of application menus and out
+    # of xdg-terminal-exec's list of terminals.
+    rm -r ${D}${PREFIX}/share/applications ${D}${PREFIX}/share/xdg-terminals
+}

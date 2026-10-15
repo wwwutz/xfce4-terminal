@@ -1,0 +1,242 @@
+vte: keep text readable (minimum contrast), on by default
+
+Text whose WCAG 2 contrast ratio against its background is below the
+minimum is drawn lighter or darker in draw_cells(), mixing it toward
+white or black so that its hue stays.  Covers normal text, selection,
+the character under the block cursor and input-method text; only the
+drawing changes.  Text with the same color chosen for text and
+background (hidden) is left alone; dim text gets half the margin.
+
+The ratio is the new property VteTerminal:minimum-contrast (1.0 = off;
+no new C functions), default 3.0 or VTE_MINIMUM_CONTRAST from the
+environment.  Same as xterm's minimumContrast resource.
+
+Apply after vte-0.84.1-do-not-use-std-out_ptr.patch.
+
+Commits (branch min-contrast on vte-0.84.1):
+  a8f6e31 Keep text readable: minimum contrast, on by default
+  7a537c4 Add VteTerminal:minimum-contrast property
+
+diff --git a/src/vte.cc b/src/vte.cc
+index 843b159..3151617 100644
+--- a/src/vte.cc
++++ b/src/vte.cc
+@@ -8853,6 +8853,95 @@ Terminal::text_blink_timer_callback()
+         return false; /* don't run again */
+ }
+ 
++/*
++ * Minimum contrast: text whose WCAG 2 contrast ratio against its background
++ * is below the minimum (the minimum-contrast property; its default is 3.0,
++ * or VTE_MINIMUM_CONTRAST from the environment; 1 or less disables) is drawn
++ * lighter or darker, mixing it toward white or black so that its hue stays,
++ * until it reaches the ratio.  Only the drawing changes; the colors
++ * applications chose stay as they are.  Same as xterm's minimumContrast.
++ */
++namespace {
++
++double
++default_minimum_contrast()
++{
++        static double const value = [] {
++                auto const env = g_getenv("VTE_MINIMUM_CONTRAST");
++                return env ? g_ascii_strtod(env, nullptr) : 3.0;
++        }();
++        return value;
++}
++
++/* WCAG 2 relative luminance, 0.0 .. 1.0 */
++double
++relative_luminance(vte::color::rgb const& c)
++{
++        auto const linear = [](unsigned v) {
++                auto const s = v / 65535.0;
++                return s <= 0.04045 ? s / 12.92 : pow((s + 0.055) / 1.055, 2.4);
++        };
++        return 0.2126 * linear(c.red) + 0.7152 * linear(c.green) + 0.0722 * linear(c.blue);
++}
++
++/* @c mixed toward @target (0 or 0xffff) by @n/256 */
++vte::color::rgb
++mix_toward(vte::color::rgb const& c,
++           unsigned target,
++           unsigned n)
++{
++        auto const one = [&](unsigned v) {
++                return (uint16_t)(v + ((int)target - (int)v) * (int)n / 256);
++        };
++        auto result = c;
++        result.red = one(c.red);
++        result.green = one(c.green);
++        result.blue = one(c.blue);
++        return result;
++}
++
++void
++ensure_minimum_contrast(vte::color::rgb& fg,
++                        vte::color::rgb const& bg,
++                        double wanted,
++                        bool dim)
++{
++        if (dim)  /* half the margin, so dim text still looks dimmer */
++                wanted = 1.0 + (wanted - 1.0) / 2.0;
++        if (wanted <= 1.0)
++                return;
++
++        auto const yf = relative_luminance(fg);
++        auto const yb = relative_luminance(bg);
++        /* luminance fg needs, if lighter or darker than bg */
++        auto const need_light = wanted * (yb + 0.05) - 0.05;
++        auto const need_dark = (yb + 0.05) / wanted - 0.05;
++        if (yf >= need_light || yf <= need_dark)
++                return;
++
++        /* prefer the side fg is already on, if it can get there */
++        auto lighter = yf > yb ? (need_light <= 1.0 || need_dark < 0.0)
++                               : (need_dark < 0.0 && need_light <= 1.0);
++        /* neither side reaches it: take whichever end is better */
++        if (need_light > 1.0 && need_dark < 0.0)
++                lighter = 1.05 / (yb + 0.05) > (yb + 0.05) / 0.05;
++
++        auto const target = lighter ? 0xffffu : 0u;
++        auto const limit = lighter ? std::min(need_light, 1.0) : std::max(need_dark, 0.0);
++        auto lo = 0u, hi = 256u;
++        while (lo < hi) {
++                auto const mid = (lo + hi) / 2;
++                auto const y = relative_luminance(mix_toward(fg, target, mid));
++                if (lighter ? y >= limit : y <= limit)
++                        hi = mid;
++                else
++                        lo = mid + 1;
++        }
++        fg = mix_toward(fg, target, lo);
++}
++
++} // anon namespace
++
+ /* Draw a string of characters with similar attributes. */
+ void
+ Terminal::draw_cells(vte::view::DrawingContext::TextRequest* items,
+@@ -8876,6 +8965,19 @@ Terminal::draw_cells(vte::view::DrawingContext::TextRequest* items,
+ 
+         rgb_from_index<8, 8, 8>(fore, fg);
+         rgb_from_index<8, 8, 8>(back, bg);
++
++        /* Keep text readable, unless the application chose the same color
++         * for text and background, e.g., to hide it.  Equal pixels can also
++         * come from different colors (e.g., a palette entry matching the
++         * default background), which this does fix. */
++        {
++                auto const rgb_mask = VTE_RGB_COLOR_MASK(8, 8, 8);
++                auto const dim = !(fore & rgb_mask) && (fore & VTE_DIM_COLOR);
++                auto const plain_fore = dim ? (fore & ~VTE_DIM_COLOR) : fore;
++                if (plain_fore != back)
++                        ensure_minimum_contrast(fg, bg, minimum_contrast(), dim);
++        }
++
+         // FIXMEchpe defer resolving deco color until we actually need to draw an underline?
+         if (deco == VTE_DEFAULT_FG)
+                 dc = fg;
+@@ -10360,6 +10462,24 @@ Terminal::set_allow_bold(bool setting)
+         return true;
+ }
+ 
++double
++Terminal::minimum_contrast() const noexcept
++{
++        return m_minimum_contrast < 0.0 ? default_minimum_contrast() : m_minimum_contrast;
++}
++
++bool
++Terminal::set_minimum_contrast(double ratio)
++{
++        if (_vte_double_equal(ratio, minimum_contrast()))
++                return false;
++
++        m_minimum_contrast = ratio;
++        invalidate_all();
++
++        return true;
++}
++
+ bool
+ Terminal::set_bold_is_bright(bool setting)
+ {
+diff --git a/src/vtegtk.cc b/src/vtegtk.cc
+index 0a37ea3..d184498 100644
+--- a/src/vtegtk.cc
++++ b/src/vtegtk.cc
+@@ -1036,6 +1036,9 @@ try
+                 case PROP_INPUT_ENABLED:
+                         g_value_set_boolean (value, vte_terminal_get_input_enabled (terminal));
+                         break;
++                case PROP_MINIMUM_CONTRAST:
++                        g_value_set_double (value, IMPL(terminal)->minimum_contrast());
++                        break;
+                 case PROP_MOUSE_POINTER_AUTOHIDE:
+                         g_value_set_boolean (value, vte_terminal_get_mouse_autohide (terminal));
+                         break;
+@@ -1194,6 +1197,10 @@ try
+                 case PROP_INPUT_ENABLED:
+                         vte_terminal_set_input_enabled (terminal, g_value_get_boolean (value));
+                         break;
++                case PROP_MINIMUM_CONTRAST:
++                        if (IMPL(terminal)->set_minimum_contrast(g_value_get_double (value)))
++                                g_object_notify_by_pspec(object, pspecs[PROP_MINIMUM_CONTRAST]);
++                        break;
+                 case PROP_MOUSE_POINTER_AUTOHIDE:
+                         vte_terminal_set_mouse_autohide (terminal, g_value_get_boolean (value));
+                         break;
+@@ -2436,6 +2443,19 @@ vte_terminal_class_init(VteTerminalClass *klass)
+                                       TRUE,
+                                       (GParamFlags) (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS | G_PARAM_EXPLICIT_NOTIFY));
+ 
++        /**
++         * VteTerminal:minimum-contrast:
++         *
++         * The minimum WCAG 2 contrast ratio between text and its background,
++         * from 1.0 (off) to 21.0.  Text with less contrast is drawn lighter or
++         * darker, keeping its hue.  The default is 3.0, or the value of
++         * VTE_MINIMUM_CONTRAST in the environment.
++         */
++        pspecs[PROP_MINIMUM_CONTRAST] =
++                g_param_spec_double ("minimum-contrast", NULL, NULL,
++                                     1.0, 21.0, 3.0,
++                                     (GParamFlags) (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS | G_PARAM_EXPLICIT_NOTIFY));
++
+         /**
+          * VteTerminal:pointer-autohide:
+          *
+diff --git a/src/vtegtk.hh b/src/vtegtk.hh
+index c4e6667..0b35e6f 100644
+--- a/src/vtegtk.hh
++++ b/src/vtegtk.hh
+@@ -90,6 +90,7 @@ enum {
+         PROP_HYPERLINK_HOVER_URI,
+         PROP_ICON_TITLE,
+         PROP_INPUT_ENABLED,
++        PROP_MINIMUM_CONTRAST,
+         PROP_MOUSE_POINTER_AUTOHIDE,
+         PROP_PTY,
+         PROP_REWRAP_ON_RESIZE,
+diff --git a/src/vteinternal.hh b/src/vteinternal.hh
+index 4ba6357..528b9bd 100644
+--- a/src/vteinternal.hh
++++ b/src/vteinternal.hh
+@@ -495,6 +495,7 @@ public:
+         bool m_audible_bell{true};
+         bool m_allow_bold{true};
+         bool m_bold_is_bright{false};
++        double m_minimum_contrast{-1.0}; /* < 0: VTE_MINIMUM_CONTRAST or 3.0 */
+         bool m_rewrap_on_resize{true};
+         gboolean m_text_modified_flag;
+         gboolean m_text_inserted_flag;
+@@ -1588,6 +1589,8 @@ public:
+         auto backspace_binding() const noexcept { return m_backspace_binding; }
+         bool set_background_alpha(double alpha);
+         bool set_bold_is_bright(bool setting);
++        double minimum_contrast() const noexcept;
++        bool set_minimum_contrast(double ratio);
+         bool set_cell_height_scale(double scale);
+         bool set_cell_width_scale(double scale);
+         bool set_cjk_ambiguous_width(int width);

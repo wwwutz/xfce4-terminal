@@ -1,0 +1,215 @@
+xfce4-terminal: View > Minimum Contrast toggle
+
+New preference misc-minimum-contrast (default on) and a check item in
+the View menu (also in the context menu's View Options) to switch VTE's
+minimum contrast off and on for all terminals.  Needs a VTE with the
+VteTerminal:minimum-contrast property (vte-0.84.1-min-contrast.patch);
+it is looked up at runtime, so without it the item is just not shown.
+
+Apply after xfce4-terminal-1.1.5-embedded-font.patch.
+
+Commits (branch embedded-font on xfce4-terminal-1.1.5):
+  7935f1a Add View > Minimum Contrast toggle
+
+diff --git a/terminal/terminal-preferences.c b/terminal/terminal-preferences.c
+index 50247a3..462d3aa 100644
+--- a/terminal/terminal-preferences.c
++++ b/terminal/terminal-preferences.c
+@@ -99,6 +99,7 @@ enum
+   PROP_MISC_DEFAULT_GEOMETRY,
+   PROP_MISC_INHERIT_GEOMETRY,
+   PROP_MISC_MENUBAR_DEFAULT,
++  PROP_MISC_MINIMUM_CONTRAST,
+   PROP_MISC_MOUSE_AUTOHIDE,
+   PROP_MISC_MOUSE_WHEEL_ZOOM,
+   PROP_MISC_RESIZE_ON_ZOOM,
+@@ -919,6 +920,19 @@ terminal_preferences_class_init (TerminalPreferencesClass *klass)
+                           TRUE,
+                           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
+ 
++  /**
++   * TerminalPreferences:misc-minimum-contrast:
++   *
++   * Whether VTE draws text with too little contrast against its background
++   * lighter or darker (VteTerminal:minimum-contrast, if VTE has it).
++   **/
++  preferences_props[PROP_MISC_MINIMUM_CONTRAST] =
++    g_param_spec_boolean ("misc-minimum-contrast",
++                          NULL,
++                          "MiscMinimumContrast",
++                          TRUE,
++                          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
++
+   /**
+    * TerminalPreferences:misc-mouse-autohide:
+    **/
+diff --git a/terminal/terminal-screen.c b/terminal/terminal-screen.c
+index 6936f8d..4c53005 100644
+--- a/terminal/terminal-screen.c
++++ b/terminal/terminal-screen.c
+@@ -162,6 +162,8 @@ terminal_screen_update_misc_cursor_blinks (TerminalScreen *screen);
+ static void
+ terminal_screen_update_misc_cursor_shape (TerminalScreen *screen);
+ static void
++terminal_screen_update_misc_minimum_contrast (TerminalScreen *screen);
++static void
+ terminal_screen_update_misc_mouse_autohide (TerminalScreen *screen);
+ static void
+ terminal_screen_update_misc_rewrap_on_resize (TerminalScreen *screen);
+@@ -242,6 +244,8 @@ struct _TerminalScreen
+   GtkWidget *scrollbar;
+   GtkWidget *tab_label;
+ 
++  gdouble minimum_contrast; /* VTE's own ratio, used while the preference is on */
++
+   GdkRGBA background_color;
+ 
+   guint session_id;
+@@ -429,6 +433,9 @@ terminal_screen_init (TerminalScreen *screen)
+   terminal_screen_update_misc_bell (screen);
+   terminal_screen_update_misc_cursor_blinks (screen);
+   terminal_screen_update_misc_cursor_shape (screen);
++  if (terminal_screen_has_minimum_contrast ())
++    g_object_get (G_OBJECT (screen->terminal), "minimum-contrast", &screen->minimum_contrast, NULL);
++  terminal_screen_update_misc_minimum_contrast (screen);
+   terminal_screen_update_misc_mouse_autohide (screen);
+   terminal_screen_update_misc_rewrap_on_resize (screen);
+   terminal_screen_update_scrolling_bar (screen);
+@@ -709,6 +716,8 @@ terminal_screen_preferences_changed (TerminalPreferences *preferences,
+     terminal_screen_update_misc_cursor_blinks (screen);
+   else if (strcmp ("misc-cursor-shape", name) == 0)
+     terminal_screen_update_misc_cursor_shape (screen);
++  else if (strcmp ("misc-minimum-contrast", name) == 0)
++    terminal_screen_update_misc_minimum_contrast (screen);
+   else if (strcmp ("misc-mouse-autohide", name) == 0)
+     terminal_screen_update_misc_mouse_autohide (screen);
+   else if (strcmp ("misc-rewrap-on-resize", name) == 0)
+@@ -1377,6 +1386,38 @@ terminal_screen_update_misc_cursor_shape (TerminalScreen *screen)
+ }
+ 
+ 
++static void
++terminal_screen_update_misc_minimum_contrast (TerminalScreen *screen)
++{
++  gboolean bval;
++
++  if (!terminal_screen_has_minimum_contrast ())
++    return;
++
++  g_object_get (G_OBJECT (screen->preferences), "misc-minimum-contrast", &bval, NULL);
++  g_object_set (G_OBJECT (screen->terminal), "minimum-contrast", bval ? screen->minimum_contrast : 1.0, NULL);
++}
++
++
++
++/**
++ * terminal_screen_has_minimum_contrast:
++ *
++ * Return value: whether the VTE in use can keep text readable
++ *               (VteTerminal:minimum-contrast, a local VTE patch).
++ **/
++gboolean
++terminal_screen_has_minimum_contrast (void)
++{
++  GObjectClass *klass = g_type_class_ref (VTE_TYPE_TERMINAL);
++  gboolean result = g_object_class_find_property (klass, "minimum-contrast") != NULL;
++
++  g_type_class_unref (klass);
++  return result;
++}
++
++
++
+ static void
+ terminal_screen_update_misc_mouse_autohide (TerminalScreen *screen)
+ {
+diff --git a/terminal/terminal-screen.h b/terminal/terminal-screen.h
+index 5547b16..55133cf 100644
+--- a/terminal/terminal-screen.h
++++ b/terminal/terminal-screen.h
+@@ -146,6 +146,9 @@ terminal_screen_update_font (TerminalScreen *screen);
+ 
+ gboolean
+ terminal_screen_get_input_enabled (TerminalScreen *screen);
++
++gboolean
++terminal_screen_has_minimum_contrast (void);
+ void
+ terminal_screen_set_input_enabled (TerminalScreen *screen,
+                                    gboolean enabled);
+diff --git a/terminal/terminal-window.c b/terminal/terminal-window.c
+index 9d81bf1..0eba5bb 100644
+--- a/terminal/terminal-window.c
++++ b/terminal/terminal-window.c
+@@ -244,6 +244,8 @@ terminal_window_action_toggle_borders (TerminalWindow *window);
+ static gboolean
+ terminal_window_action_fullscreen (TerminalWindow *window);
+ static gboolean
++terminal_window_action_minimum_contrast (TerminalWindow *window);
++static gboolean
+ terminal_window_action_readonly (TerminalWindow *window);
+ static gboolean
+ terminal_window_action_scroll_on_output (TerminalWindow *window);
+@@ -901,6 +903,16 @@ static XfceGtkActionEntry action_entries[] = {
+     "view-fullscreen",
+     G_CALLBACK (terminal_window_action_fullscreen),
+   },
++  {
++    TERMINAL_WINDOW_ACTION_MINIMUM_CONTRAST,
++    "<Actions>/terminal-window/minimum-contrast",
++    "",
++    XFCE_GTK_CHECK_MENU_ITEM,
++    N_ ("Minimum _Contrast"),
++    N_ ("Draw text lighter or darker where its colors would make it hard to read"),
++    NULL,
++    G_CALLBACK (terminal_window_action_minimum_contrast),
++  },
+   {
+     TERMINAL_WINDOW_ACTION_READ_ONLY,
+     "<Actions>/terminal-window/read-only",
+@@ -2586,6 +2598,19 @@ terminal_window_action_toggle_borders (TerminalWindow *window)
+ 
+ 
+ 
++static gboolean
++terminal_window_action_minimum_contrast (TerminalWindow *window)
++{
++  gboolean minimum_contrast;
++
++  /* a preference: applies to all terminals and is saved */
++  g_object_get (G_OBJECT (window->priv->preferences), "misc-minimum-contrast", &minimum_contrast, NULL);
++  g_object_set (G_OBJECT (window->priv->preferences), "misc-minimum-contrast", !minimum_contrast, NULL);
++  return TRUE;
++}
++
++
++
+ static gboolean
+ terminal_window_action_fullscreen (TerminalWindow *window)
+ {
+@@ -3886,6 +3911,13 @@ terminal_window_menu_add_section (TerminalWindow *window,
+       xfce_gtk_toggle_menu_item_new_from_action_entry (get_action_entry (TERMINAL_WINDOW_ACTION_SHOW_TOOLBAR), G_OBJECT (window), gtk_widget_is_visible (window->toolbar), GTK_MENU_SHELL (insert_to_menu));
+       xfce_gtk_toggle_menu_item_new_from_action_entry (get_action_entry (TERMINAL_WINDOW_ACTION_SHOW_BORDERS), G_OBJECT (window), gtk_window_get_decorated (GTK_WINDOW (window)), GTK_MENU_SHELL (insert_to_menu));
+       xfce_gtk_toggle_menu_item_new_from_action_entry (get_action_entry (TERMINAL_WINDOW_ACTION_FULLSCREEN), G_OBJECT (window), window->is_fullscreen, GTK_MENU_SHELL (insert_to_menu));
++      if (terminal_screen_has_minimum_contrast ())
++        {
++          gboolean minimum_contrast;
++
++          g_object_get (G_OBJECT (window->priv->preferences), "misc-minimum-contrast", &minimum_contrast, NULL);
++          xfce_gtk_toggle_menu_item_new_from_action_entry (get_action_entry (TERMINAL_WINDOW_ACTION_MINIMUM_CONTRAST), G_OBJECT (window), minimum_contrast, GTK_MENU_SHELL (insert_to_menu));
++        }
+       xfce_gtk_menu_append_separator (GTK_MENU_SHELL (menu));
+     }
+ 
+diff --git a/terminal/terminal-window.h b/terminal/terminal-window.h
+index ece2e3d..916ce11 100644
+--- a/terminal/terminal-window.h
++++ b/terminal/terminal-window.h
+@@ -88,6 +88,7 @@ typedef enum
+   TERMINAL_WINDOW_ACTION_SHOW_TOOLBAR,
+   TERMINAL_WINDOW_ACTION_SHOW_BORDERS,
+   TERMINAL_WINDOW_ACTION_FULLSCREEN,
++  TERMINAL_WINDOW_ACTION_MINIMUM_CONTRAST,
+   TERMINAL_WINDOW_ACTION_READ_ONLY,
+   TERMINAL_WINDOW_ACTION_SCROLL_ON_OUTPUT,
+ 
