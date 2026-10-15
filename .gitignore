@@ -1,0 +1,13 @@
+# upstream tarballs: see README.md for their beehive URLs
+/*.tar.xz
+/*.tar.gz
+
+# local builds and logs
+/build-*/
+/install/
+*.log
+
+# Hack Braille fonts are unpacked into the source tree for building;
+# they come from hack-braille-3.003.tar.gz (see README.md)
+/xfce4-terminal-1.1.5/hack-braille-*/
+/xfce4-terminal-1.1.5/terminal/embedded-fonts.h
