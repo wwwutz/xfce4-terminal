@@ -11,3 +11,6 @@
 # they come from hack-braille-3.003.tar.gz (see README.md)
 /xfce4-terminal-1.1.5/hack-braille-*/
 /xfce4-terminal-1.1.5/terminal/embedded-fonts.h
+
+# meson's lock file, created when building VTE
+/vte-0.84.1/subprojects/.wraplock
