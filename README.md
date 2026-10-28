@@ -1,7 +1,7 @@
 # xfce4-terminal and VTE: readable colours, braille-capable default font
 
 Development repository for two changes to the mariux64 packages
-`vte-0.84.1-1` and `xfce4-terminal-1.1.5-1` (see `vte.be0` and
+`vte-0.84.1-1` and `xfce4-terminal-1.1.5-3` (see `vte.be0` and
 `xfce4-terminal.be0`, as committed in bee-files):
 
 - **Minimum contrast (VTE).** Text whose WCAG 2 contrast ratio against its
@@ -88,4 +88,9 @@ VTE: mostly LGPL 3, parts GPL 3 and others (see `vte-0.84.1/COPYING.README`);
 the bundled subprojects carry their own licences. xfce4-terminal:
 GPL-2.0-or-later (`xfce4-terminal-1.1.5/COPYING`). Hack Braille: as Hack,
 MIT and the Bitstream Vera License (in the font tarball). The changes here
-are under the licence of the project they change.
+are under the licence of the project they change; the files they add name
+their author.
+
+The rest of this repository (the bee files, this README and the screenshots)
+is Copyright 2026 Peter Marquardt <wwwutz@users.noreply.github.com> and
+under the MIT License (`LICENSE`).

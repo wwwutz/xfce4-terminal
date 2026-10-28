@@ -12,6 +12,7 @@ Apply after xfce4-terminal-1.2-paste-warning-default-false.patch.
 
 Commits (branch embedded-font on xfce4-terminal-1.1.5):
   5c76cf1 Embed Hack Braille and make it the default font
+  2c7c130 Add copyright notices to the new font embedding files
 
 diff --git a/configure.ac b/configure.ac
 index d475607..2fc32b5 100644
@@ -112,11 +113,14 @@ index 9102724..ac36b79 100644
  
 diff --git a/terminal/mkembedfont.sh b/terminal/mkembedfont.sh
 new file mode 100755
-index 0000000..c0bbf32
+index 0000000..122dc21
 --- /dev/null
 +++ b/terminal/mkembedfont.sh
-@@ -0,0 +1,27 @@
+@@ -0,0 +1,30 @@
 +#!/bin/sh
++# Copyright (c) 2026 Peter Marquardt <wwwutz@users.noreply.github.com>
++# SPDX-License-Identifier: GPL-2.0-or-later
++#
 +# Generate embedded-fonts.h, which terminal-embedded-fonts.c compiles into
 +# xfce4-terminal, from the font files given as arguments.  Uses only od and sed.
 +set -e
@@ -145,11 +149,13 @@ index 0000000..c0bbf32
 +echo "};"
 diff --git a/terminal/terminal-embedded-fonts.c b/terminal/terminal-embedded-fonts.c
 new file mode 100644
-index 0000000..414fe05
+index 0000000..772aba4
 --- /dev/null
 +++ b/terminal/terminal-embedded-fonts.c
-@@ -0,0 +1,81 @@
+@@ -0,0 +1,83 @@
 +/*-
++ * Copyright (c) 2026 Peter Marquardt <wwwutz@users.noreply.github.com>
++ *
 + * This program is free software; you can redistribute it and/or modify it
 + * under the terms of the GNU General Public License as published by the Free
 + * Software Foundation; either version 2 of the License, or (at your option)
@@ -232,11 +238,13 @@ index 0000000..414fe05
 +}
 diff --git a/terminal/terminal-embedded-fonts.h b/terminal/terminal-embedded-fonts.h
 new file mode 100644
-index 0000000..00975dd
+index 0000000..d7251c6
 --- /dev/null
 +++ b/terminal/terminal-embedded-fonts.h
-@@ -0,0 +1,27 @@
+@@ -0,0 +1,29 @@
 +/*-
++ * Copyright (c) 2026 Peter Marquardt <wwwutz@users.noreply.github.com>
++ *
 + * This program is free software; you can redistribute it and/or modify it
 + * under the terms of the GNU General Public License as published by the Free
 + * Software Foundation; either version 2 of the License, or (at your option)

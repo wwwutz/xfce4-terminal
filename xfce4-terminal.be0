@@ -1,6 +1,6 @@
 #!/usr/bin/env beesh
 
-# BEE_VERSION xfce4-terminal-1.1.5-1
+# BEE_VERSION xfce4-terminal-1.1.5-3
 
 #SRCURL[0]="https://archive.xfce.org/src/apps/xfce4-terminal/${PKGVERSION[2]}/xfce4-terminal-${PKGVERSION}.tar.xz"
 SRCURL[0]="https://beehive.molgen.mpg.de/d779b64ead82330b6bbc7d500f542490/xfce4-terminal-1.1.5.tar.xz"
@@ -9,9 +9,10 @@ SRCURL[1]="https://beehive.molgen.mpg.de/9d3164696416dac1787155b809fd6787/hack-b
 
 PATCHURL+=("https://beehive.molgen.mpg.de/8d9408ec1b4244ffa3215d588dd45dca/xfce4-terminal-1.2-paste-warning-default-false.patch")
 # Local names carry the md5: bee reuses any cached file of the same name.
-PATCHURL+=("https://beehive.molgen.mpg.de/41880e975f5ad5e4d0229ef31653bb48/xfce4-terminal-1.1.5-embedded-font.patch xfce4-terminal-1.1.5-embedded-font-41880e97.patch")
+PATCHURL+=("https://beehive.molgen.mpg.de/5f355fe17b5274df3f927893441a2e11/xfce4-terminal-1.1.5-embedded-font.patch xfce4-terminal-1.1.5-embedded-font-5f355fe1.patch")
 # View > Minimum Contrast (needs vte with VteTerminal:minimum-contrast, otherwise hidden)
 PATCHURL+=("https://beehive.molgen.mpg.de/ff7d5a19356d52cdebfb3a900b4839fb/xfce4-terminal-1.1.5-minimum-contrast-toggle.patch xfce4-terminal-1.1.5-minimum-contrast-toggle-ff7d5a19.patch")
+PATCHURL+=("https://beehive.molgen.mpg.de/017b304f5a178696e2d8fb1a006a3ed0/0001-Let-scroll-accels-fall-through-unless-their-modifier.patch")
 
 # EXCLUDE+=()
 
