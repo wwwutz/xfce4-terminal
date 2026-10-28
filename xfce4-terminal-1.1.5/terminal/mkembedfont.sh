@@ -1,4 +1,7 @@
 #!/bin/sh
+# Copyright (c) 2026 Peter Marquardt <wwwutz@users.noreply.github.com>
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
 # Generate embedded-fonts.h, which terminal-embedded-fonts.c compiles into
 # xfce4-terminal, from the font files given as arguments.  Uses only od and sed.
 set -e
